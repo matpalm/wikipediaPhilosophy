@@ -1,0 +1,204 @@
+distance to philosophy
+
+http://xkcd.com/903/
+
+not such a big deal
+
+questions
+1) do all wikipedia articles link to philosophy?
+2) what distribution do the distances take?
+
+method:
+1) get wikipedia dump from volume
+2) parse to make a graph; term -> term
+3) connected components; is it one? if not which one is philosophy in?
+4) histogram of distances
+
+part 1) get wikipedia dump from volume
+
+go to snapshot snap-1781757e Wikipedia Extraction-WEX (Linux)
+from it make a volume vol-? (in, say,  us-east-1c)
+make an instance; ebs backed
+attach volume to instance  i-71941410 (also in us-east-1c)
+
+device /dev/sdk
+
+copy from ebs to hdfs
+
+ mkdir wiki; 
+ sudo mount /dev/xvdk wiki
+ hadoop fs -mkdir /full/articles
+ hadoop fs -copyFromLocal wiki/rawd/freebase-wex-2009-01-12-articles.tsv /full/articles_one_file # 7 min
+ hadoop fs -mkdir /full/redirects
+ hadoop fs -copyFromLocal wiki/rawd/freebase-wex-2009-01-12-redirects.tsv /full/redirects
+
+and for testing...
+ hadoop fs -mkdir /sample/articles
+ head -n100 wiki/rawd/freebase-wex-2009-01-12-articles.tsv > sample
+ hadoop fs -copyFromLocal sample /sample/articles/freebase-wex-2009-01-12-articles.tsv
+
+the interesting file is wiki/rawd/freebase-wex-2009-01-12-articles.tsv
+which is 31G; 4,183,153 articles
+
+http://wiki.freebase.com/wiki/WEX/Documentation
+
+it has 5 columns 
+0 - id
+1 - title
+2 - date
+3 - xml
+4 - plain text
+
+(maybe ignore this)
+before going too far it'd be interesting to extract the actual list of titles..
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar -input /sample/articles/ -output /sample/titles -mapper '/usr/bin/cut -f2' -numReduceTasks 0
+b(maybe ignore this)
+
+first need to split into chunks for in/out of s3 (with gzipping)
+
+hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+ -D mapred.min.split.size=419430400 \
+ -D mapred.output.compress=true \
+ -D mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec  \
+ -input /full/articles_one_file/ -output /full/articles \
+ -mapper /bin/cat -numReduceTasks 0 
+
+reduces it to 79 files, 75mb each, 6gb total
+
+after playing with the data and bit (and refining the algorithm) the basic heuristic is
+ ignore until first <sentence>
+ find first <target> that isn't article name (as often, the first one is)
+
+of course it's not that simple, there are lots of extra special cases...
+
+1) sometimes the article itself is a meta file
+eg [File:BSicon ABZvlr.svg] [Category:AB Castellón players] or [Template:Sharpness Branch Line]
+
+what the distinct values of these?
+
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+  -input /sample/articles/ -output /sample/article_types \
+  -mapper '/usr/bin/python metaArticleTypes.py' -file metaArticleTypes.py \
+  -reducer aggregate
+
+of course, nothing is clean :D
+
+$ hfs -cat /full/article_types/*|sort -k2 -t'    ' -nr|head -n20
+normal file		 2684331
+File   862604
+Category	434783
+Template	164138
+Portal		15543
+Portal talk	1175
+File talk	903
+Category:Wikipedians by alma mater	739
+Meanings of minor planet names		218
+List of minor planets	 203
+ISO 3166-2    198
+List of United Kingdom locations	125
+List of drugs  114
+Star Wars      91
+Star Trek      85
+Template:Ph    83
+Library of Congress Classification	83
+Theme Time Radio Hour			81
+Live Phish Downloads			74
+Batman	   66
+
+so maybe ignore; File, Category, Template, Portal, Portal talk, File talk
+curious now, what do these represent?
+
+$ hfs -cat /full/articles/part-00232.gz | gunzip | cut -f2 | grep ^File | shuf | head
+File:TriGeo Logo.JPG
+File:Tuckerdorothy.jpg
+File:Hippoquarium.jpg
+File:Gbridge-cap.jpg
+File:Twoc.jpg
+File:Eurovision 81.jpg
+File:BMW 003 jet engine.JPG
+File:Lochailort.jpg
+File:New Zealand General Service Medal - Iraq.jpg
+File:Pixiesheadon.jpg
+
+$ hfs -cat /full/articles/part-00232.gz | gunzip | cut -f2 | grep ^Category | shuf | head
+Category:User bcl-3
+Category:Sport in Hamilton, New Zealand
+Category:People murdered in Norfolk Island
+Category:Top-importance Old-time Base Ball articles
+Category:Calgary Mustangs players
+Category:NA-Class Japanese baseball articles
+Category:Deaths by firearm in Nebraska
+Category:Irish folk-song collectors
+Category:University of Maryland, Baltimore County faculty
+Category:Human death in Nebraska
+
+$ hfs -cat /full/articles/part-00232.gz | gunzip | cut -f2 | grep ^Portal | shuf | head
+Portal:Furry/Did you know/2
+Portal:Western Australia/Selected article/September 2008
+Portal:Edgar Allan Poe/Selected picture/October
+Portal:Tropical cyclones/Featured article/Monsoon trough
+Portal:Spaceflight/On This Day/5 September
+Portal:Philadelphia/Philadelphia news/September 2008
+Portal:BBC/Selected article/2
+Portal:Greater Manchester/Did you know/archive
+Portal:Japan/Did you know/56
+Portal talk:Trains/Anniversaries/August 30
+
+
+ ignore until first <sentence>
+ find first <target> that 
+  isn't article name (as often, the first one is)
+  doesn't start with File:, Category:, Template:, Portal:, Portal talk:, File talk:
+
+sometimes we just need to ignore the "article" too.
+i think when the 'plain text' (col[4]) is <100 characters it's probably a meta article too...
+
+in fact this seems to be a more general case;
+
+so... 
+ ignore if plain_text < 100 chars
+ ignore until first sentence
+  find first <target> that isn't article name
+
+there is also another interesting file is freebase-wex-2009-01-12-redirects.tsv
+which i suspect will be required since sometimes the second target will require redirect dereference
+
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+  -input /sample/articles/ -output /sample/edges \
+  -mapper '/usr/bin/python articleParser.py' -file articleParser.py
+  -numReduceTasks 0
+
+
+agassi should be 'List of ATP number 1 ranked players'
+(would be 'Kirk Kerkorian', his middle name, if we include synthetic links)
+
+ remove all templates 
+  <template.*?</template>
+ remove all sythentic links 
+  <link synthetic="true">.*?</link> 
+ first target
+  andre agassi link removed since synthetic
+
+structure was...
+articles
+ article
+  paragraph
+   sentence
+    first target  
+
+though i think just targets after removing templates is enough...
+
+comparing with ayn_rand
+ it would be 'American values' if we include 'link synthetic="true"'
+ but 'novelist' if we exclude 'link synthetic="true"'
+
+sometimes there iis text before the 1st paragraph, eg disambiguation info...
+so need to trim to first paragraph too!!
+
+ trim to first paragraph
+ remove all templates 
+  <template.*?</template>
+ remove all sythentic links 
+  <link synthetic="true">.*?</link> 
+ first target
+  andre agassi link removed since synthetic
