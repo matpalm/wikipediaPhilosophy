@@ -71,7 +71,6 @@ after playing with the data and bit (and refining the algorithm) the basic heuri
 
 of course it's not that simple, there are lots of extra special cases...
 
-1) sometimes the article itself is a meta file
 eg [File:BSicon ABZvlr.svg] [Category:AB Castellón players] or [Template:Sharpness Branch Line]
 
 what the distinct values of these?
@@ -195,6 +194,11 @@ comparing with ayn_rand
 sometimes there iis text before the 1st paragraph, eg disambiguation info...
 so need to trim to first paragraph too!!
 
+final is then..
+
+ ignore "articles" that have a name starting with 'File:', 'Template:',etc
+ ignore "articles" that have plain text less than 30 chars
+
  trim to first paragraph
  remove all templates 
   <template.*?</template>
@@ -202,3 +206,15 @@ so need to trim to first paragraph too!!
   <link synthetic="true">.*?</link> 
  first target
   andre agassi link removed since synthetic
+
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+  -input /sample/articles/ -output /sample/edges \
+  -mapper '/usr/bin/python articleParser.py' -file articleParser.py
+  -numReduceTasks 0
+
+
+no_outbound_link_found 15,491
+plain_text_too_short   61,863	
+metafile 	       1,480,805	
+Map input records      4,183,153 	
+Map output records     2,624,994 	  
