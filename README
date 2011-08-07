@@ -405,6 +405,9 @@ u'Stade Olympique Yves-du-Manoir'
 >>> links[2].part == None
 True
 
+for template in soup.findAll('template'):
+  template.extract()
+
 also needed to another heuristic which was to only examine the first 10 links 
 (otherwise the link 'fact' deep in the truth article matched a 'fact' plain text at the start of the article)
 feels dangerous...
@@ -415,6 +418,27 @@ might need to handle this in graph redirecting, if not present, and lower case, 
 
 
 
-
+17th Delaware General Assembly 	   Delaware Senate
+1949 Coupe de France Final 	   soccer
+1999 Japan Open Tennis Championships – Women's Singles	Ai Sugiyama
+Bird Gets the Worm     Charlie Parker
+Brendan Foster 	       Order of the British Empire
+Garh More 	       Jhang District
+Harbour View, New Zealand    Lower Hutt
+Jinxiang dialect  Taihu Wu dialects
+Truth 	 Reality
   
  
+restart another cluster from scratch
+
+elastic-mapreduce --create --alive \
+ --num-instances 5 --master-instance-type m1.large --slave-instance-type m1.large \
+ --bootstrap-action s3://mkelcey/wikipediaPhilosophy/install_beautiful_soup.sh
+
+then on master
+ mkfifo articles
+ hadoop fs -copyFromLocal articles /full/2011-07-23/articles/freebase-wex-2011-07-23-articles.tsv &
+ curl -s http://download.freebase.com/wex/2011-07-23/freebase-wex-2011-07-23-articles.tsv.bz2 | bunzip2 > articles &
+ mkfifo redirects
+ hadoop fs -copyFromLocal redirects /full/2011-07-23/redirects/freebase-wex-2011-07-23-redirects.tsv &
+ curl -s http://download.freebase.com/wex/2011-07-23/freebase-wex-2011-07-23-redirects.tsv.bz2 | bunzip2 > rediects &
