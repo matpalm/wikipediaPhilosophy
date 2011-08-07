@@ -218,3 +218,203 @@ plain_text_too_short   61,863
 metafile 	       1,480,805	
 Map input records      4,183,153 	
 Map output records     2,624,994 	  
+
+looking through the diff of the from_nodes to the to_nodes in the edges
+looks like we need to convert the to_nodes to their redirects
+
+ cut -f1 all.edges | sort > all.edges.from             # 2624994 lines
+ cut -f2 all.edges | uniq | sort | uniq > all.edges.to # 497461 lines
+
+the redirects file isn't huge (3.3e6 rows, 154mb) so i thought it'd feasbile to do this in memory.
+eg see dereferenceToLinks.py
+but it's a complete fail. splitting into 16 chunks & running in parallel on cc1.4xlarge and it's a fail. 
+(running 10+hrs and each derefernce dict lookup taking roughly 2s for every 3 records (?! that's a 45hr runtime)
+i obviously need to learn me some more python...
+
+the main reason i did this since i thought they'd be multiple redirects but looking at ~200e3 samples it's not the
+case, if there is a redirect it's directly done
+
+which means this is just a join; do it in pig
+
+-- pig -p SET=sample|full -f edges_dereferenced.pig
+edges = load '$SET/edges' as (from_node: chararray, to_node: chararray);
+redirects_with_id = load '$SET/redirects' as (id:long, from_node: chararray, to_node: chararray);
+redirects = foreach redirects_with_id generate from_node, to_node;
+joined = join edges by to_node left outer, redirects by from_node;
+edges_dereferenced = foreach joined generate
+	edges::from_node as from_node, 
+	(redirects::to_node is null ? edges::to_node : redirects::to_node) as to_node;
+store edges_dereferenced into '$SET/edges_dereferenced';
+
+takes a minute. though of course this is not a fundamental pig vs python thing, it's an algorithm difference.
+a simpler merge approach could have been done in python must faster too i'm sure
+
+ cut -f1 all.edges_dereferenced | sort > all.edges_dereferenced.from             # 2624994 lines (sanity)
+ cut -f2 all.edges_dereferenced | uniq | sort | uniq > all.edges_dereferenced.to # 455224 lines
+
+
+
+now we can work on calculating the distance for each page from 'Philosophy', and this is simply a breadth first search
+
+again, trying to be pragmatic, i wrote a version in python (distanceFromPhilosophy.py) but my god it's slow...
+?seconds for ? lookups in a dict? what am i missing?
+
+Tue Aug  2 05:39:38 UTC 2011
+
+=== move to newer version of the dump
+
+mkfifo articles
+hadoop fs -copyFromLocal articles /full/articles-2011-07-08/freebase-wex-2011-07-08-articles.tsv &
+curl http://download.freebase.com/wex/latest/freebase-wex-2011-07-08-articles.tsv.bz2 | bunzip2 > articles &
+
+hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+ -D mapred.min.split.size=300000000 \
+ -input /full/2011-07-08/articles \
+ -output /full/2011-07-08/edges \
+ -mapper articleParser.py \
+ -file articleParser.py \
+ -numReduceTasks 0
+
+Job Counters
+Rack-local map tasks       0    0       189
+Launched map tasks         0   0        190
+Data-local map tasks       0   0        1
+FileSystemCounters
+HDFS_BYTES_READ            55,499,655,843       0       55,499,655,843
+HDFS_BYTES_WRITTEN         129,764,139          0               129,764,139
+parse
+no_outbound_link_found     9,647        0       9,647
+plain_text_too_short       87,599                               0       87,599
+metafile                   1,896,275                            0       1,896,275
+Map-Reduce Framework
+Map input records          5,596,834    0       5,596,834
+Spilled Records            0   0     0
+Map input bytes            55,487,987,179       0       55,487,987,179
+Map output records         3,603,313            0       3,603,313
+
+#articles => 5,596,834
+#edges extracted from articles 3,603,313
+
+# edges.from              3603313
+# edges.from (uniq)       3603249
+# edges.to   (uniq)        684632
+
+pig -p SET=/full/2011-07-08/ -f edges_dereferenced.pig
+
+# edges_dereferenced.from        3603313 (sanity)
+# edges_dereferenced.from (uniq) 3603249 (sanity)
+# edges_dereferenced.from         621604 (not as many as the 2009-01-12 dataset...)
+
+would downcasing help? maybe, but it's drifting further away from the true data
+
+-- run the fscker!
+ hfs -cat /full/2011-07-08/edges_dereferenced/* | java -classpath . com.Test "Philosophy" >edges 2>progress &
+
+lots of examples that didn't work
+
+eg truth, which is returning 'François Lemoyne' instead of 'Reality'
+
+need another gold set to work with
+
+under articles.eg
+17th_Delaware_General_Assembly.eg
+1949_Coupe_de_France_Final.eg
+1999_Japan_Open_Tennis_Championships_Womens_Singles.eg
+BAFC.eg
+Bird_Gets_the_Worm.eg
+Category_1022_books.eg
+File_Pasquale_Caggiano_png.eg
+Fort_Baxter.eg
+Jinxiang_dialect.eg
+Truth.eg
+
+$ cat article.egs/* | ./articleParser.py  2>/dev/null
+17th Delaware General Assembly		  Delaware Senate
+1949 Coupe de France Final		  soccer
+1999 Japan Open Tennis Championships – Women's Singles	Ai Sugiyama
+Bird Gets the Worm     Charlie Parker
+Jinxiang dialect       People's Republic of China
+Truth	 François Lemoyne
+
+should be....
+17th Delaware General Assembly		  Delaware Senate
+1949 Coupe de France Final		  soccer
+1999 Japan Open Tennis Championships – Women's Singles	Ai Sugiyama
+Bird Gets the Worm     Charlie Parker
+Jinxiang dialect       Taihu Wu dialects ** different
+Truth	 Fact ** different
+
+(note: 
+consider 'Jinxiang dialect'
+
+$ cut -f4 article.egs/Jinxiang_dialect.eg | sed -es/\\\\n/\ /g | xmllint --format -
+
+picked up target is from side bar...
+.. <param name="states"><link><target>People's Republic of China</target></link> ..
+
+correct target is later...
+.. or a Northern <link synthetic="true"><target>Taihu Wu dialects</target><part>Wu dialect</part></link>, spoken in ..
+
+$ cut -f5 article.egs/Jinxiang_dialect.eg | less
+The<space/><bold><link synthetic="true"><target>1949 Coupe de France Final</target><part>Coupe de France Final</part></link> 1949</bold><space/>was a<space/><link><target>soccer</target><part>football</part></link>
+
+plain text is 
+Jinxiang dialect (金鄉話), is a Taihu Wu dialect, or a Northern Wu dialect, spoken in ...
+
+so perhaps a better parsing strategy is
+ extract all target linkes, href and link text
+ choose the link target whose plain text appears first in the plain text
+
+as a sanity check consider '1949 Coupe de France Final'
+
+plain text is 
+The Coupe de France Final 1949 was a football match held at Stade ...
+
+going to need beautiful soup
+
+ wget http://www.crummy.com/software/BeautifulSoup/download/3.x/BeautifulSoup-3.2.0.tar.gz
+ tar zxf BeautifulSoup-3.2.0.tar.gz
+ cd BeautifulSoup-3.2.0
+ sudo python ./setup.py install
+
+python
+ from BeautifulSoup import BeautifulStoneSoup 
+ f = open('article.egs/1949_Coupe_de_France_Final.xml','r')
+ soup = BeautifulStoneSoup(f.read())
+ links = soup.findAll('link')
+
+then for
+ <link synthetic="true"><target>1949 Coupe de France Final</target><part>Coupe de France Final</part></link>
+
+>>> links[0].target
+<target>1949 Coupe de France Final</target>
+>>> links[0].target.string
+u'1949 Coupe de France Final'
+>>> links[0].part
+<part>Coupe de France Final</part>
+>>> links[0].part.string
+u'Coupe de France Final'
+
+and for
+ <link><target>Stade Olympique Yves-du-Manoir</target></link>
+
+>>> links[2].target
+<target>Stade Olympique Yves-du-Manoir</target>
+>>> links[2].target.string
+u'Stade Olympique Yves-du-Manoir'
+>>> links[2].part == None
+True
+
+also needed to another heuristic which was to only examine the first 10 links 
+(otherwise the link 'fact' deep in the truth article matched a 'fact' plain text at the start of the article)
+feels dangerous...
+
+also noticed that 1949_Coupe_de_France_Final.eg -> soccer 
+and not Soccer as it should, and there is no redirect, and the current life page is correctly Soccer
+might need to handle this in graph redirecting, if not present, and lower case, try upper case
+
+
+
+
+  
+ 
