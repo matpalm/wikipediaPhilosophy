@@ -23,13 +23,13 @@ def next_link(xml, article_name):
                 xml = re.sub(r'.*?'+re.escape(next_target_match.group(0)), '', xml, 1)
 
 def parse_link(link):
-    target = link.target.string if link.target else None
-    part   = link.part.string if link.part else target
+    target = str(link.target.string) if link.target else None
+    part   = str(link.part.string) if link.part else target
     return [ target, part ]
 
 for line in fileinput.input():
     cols = line.split("\t")    
-    article_name, xml, plain_text = cols[1], cols[3], cols[4]
+    article_id, article_name, xml, plain_text = cols[0], cols[1], cols[3], cols[4]
 
     # ignore "article" if it looks like a meta article name
     if meta_article(article_name):
@@ -61,7 +61,7 @@ for line in fileinput.input():
                 continue
 
             # look for word boundary match
-            match = re.search(re.compile('\\b' + text + '\\b'), plain_text)
+            match = re.search(re.compile('\\b' + re.escape(text) + '\\b'), plain_text)
             if not match:
                 continue
             index_in_plain_text = match.start()
@@ -89,5 +89,5 @@ for line in fileinput.input():
             sys.stderr.write("reporter:counter:parse,no_match,1\n")
 
     except:
-        sys.stderr.write("parse exception "+str(sys.exc_info()[0])+"\n")
         sys.stderr.write("reporter:counter:parse,exception,1\n")
+        sys.stderr.write("parsing ["+article_id+","+article_name+"] exception "+str(sys.exc_info()[0])+"\n")
