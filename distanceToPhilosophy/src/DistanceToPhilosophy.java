@@ -12,19 +12,23 @@ import java.util.Queue;
 
 public class DistanceToPhilosophy {
   
-  private final Map<String,Integer> tokenToIdx = new HashMap<String,Integer>();
-  private final Map<Integer,String> idxToToken = new HashMap<Integer,String>();
-  private int tokenIdx = 0;
-  private final String startNode;
+  private TokenDictionary tokenDictionary = new TokenDictionary();
+  
+  private final String startNode, edgesFile, redirectFile;
   
   private Map<Integer,List<Integer>> edges = new HashMap<Integer,List<Integer>>();
   
-  public static void main(String s[]) throws IOException {
-    new DistanceToPhilosophy(s[0]).go();
+  public static void main(String args[]) throws IOException {
+	if (args.length != 3) {
+		throw new RuntimeException("DistanceToPhilosophy <startNode> <edgesFile> <redirectFile>");
+	}	
+    new DistanceToPhilosophy(args).go();
   }
   
-  public DistanceToPhilosophy(String startNode) {
-    this.startNode = startNode;
+  public DistanceToPhilosophy(String[] args) {
+    this.startNode = args[0];
+    this.edgesFile = args[1];
+    this.redirectFile = args[2];
   }
   
   public void go() throws IOException {
@@ -41,13 +45,14 @@ public class DistanceToPhilosophy {
       
       String[] cols = next.split("\t");
       // note: we want the reverse graph
-      int toNode = tokenForIdx(cols[0]);
-      int fromNode = tokenForIdx(cols[1]);          
+      int toNode = tokenDictionary.tokenForIdx(cols[0]);
+      int fromNode = tokenDictionary.tokenForIdx(cols[1]);          
       
       if (edges.containsKey(fromNode)) {
         List<Integer> outboundEdges = edges.get(fromNode);
         if (outboundEdges.contains(toNode)) {
-          System.err.println("already and edge from "+fromNode+" ("+idxToToken.get(fromNode)+") to "+toNode+" ("+idxToToken.get(toNode)+")");
+          System.err.println("already and edge from "+fromNode+
+              " ("+tokenDictionary.idxToToken.get(fromNode)+") to "+toNode+" ("+tokenDictionary.idxToToken.get(toNode)+")");
         } 
         else {
           outboundEdges.add(toNode);
@@ -65,19 +70,19 @@ public class DistanceToPhilosophy {
 
     }
     
-    if (!tokenToIdx.containsKey(startNode)) {
+    if (!tokenDictionary.tokenToIdx.containsKey(startNode)) {
       throw new RuntimeException("after parsing stdin never saw starting node ["+startNode+"]");
     }
   }
 
   private void breadthFirstWalk() {
     Queue<Integer> boundary = new LinkedList<Integer>();
-    boundary.add(tokenToIdx.get(startNode));
+    boundary.add(tokenDictionary.tokenToIdx.get(startNode));
     int distance = 0;    
     while(boundary.size() != 0) {
       Queue<Integer> frontier = new LinkedList<Integer>();
       for(int edge : boundary) {
-        System.out.println(idxToToken.get(edge) + "\t" + distance);
+        System.out.println(tokenDictionary.idxToToken.get(edge) + "\t" + distance);
         if (edges.containsKey(edge)) {
           frontier.addAll(edges.get(edge));
         }
@@ -88,15 +93,5 @@ public class DistanceToPhilosophy {
     }
   }
   
-  public int tokenForIdx(String token) {
-    // build token -> idx
-    if (tokenToIdx.containsKey(token)) {
-      return tokenToIdx.get(token);      
-    }
-    else {
-      tokenToIdx.put(token, tokenIdx);
-      idxToToken.put(tokenIdx, token);
-      return tokenIdx++;
-    }
-  }
 }
+
