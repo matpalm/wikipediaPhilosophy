@@ -524,3 +524,29 @@ and then again on the newer dataset
   -input /full/2011-07-23/articles/ -output /full/2011-07-23/edges \
   -mapper '/usr/bin/python articleParser.py' -file articleParser.py
 
+Job Counters 		   
+Launched reduce tasks   0	0	10
+Rack-local map tasks 	   0 	    0 	   263
+Launched map tasks 	   0 	    0 	   470
+Data-local map tasks 	   0 	    0 	   207
+FileSystemCounters 	   
+FILE_BYTES_READ	           0	86,548,215	86,548,215
+HDFS_BYTES_READ 	   55,858,012,523 	0 	55,858,012,523
+FILE_BYTES_WRITTEN 	   106,092,612 		86,548,215	192,640,827
+HDFS_BYTES_WRITTEN 	   0 			132,850,425 	132,850,425
+parse 			   
+10_links_examined_limit    1,979,326	0	1,979,326
+no_match 		   189,558 				0 		189,558
+metafile 		   1,902,795 				0 		1,902,795
+Map-Reduce Framework 	   
+Reduce input groups 	   0 		3,523,601	3,523,601
+Combine output records 	   0 	  0 	0
+Map input records 	   5,615,981 	0	5,615,981
+Reduce shuffle bytes 	   0 		105,796,399	105,796,399
+Reduce output records 	   0 		3,523,628 	3,523,628
+Spilled Records 	   3,523,628 	3,523,628 	7,047,256
+Map output bytes 	   132,850,552 	0 		132,850,552
+Map input bytes 	   55,825,702,860 		0	55,825,702,860
+Map output records 	   3,523,628 			0 	3,523,628
+Combine input records 	   0 				0 	0
+Reduce input records 	   0 				3,523,628	3,523,628
