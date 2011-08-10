@@ -561,4 +561,215 @@ found a big problem, one of the major links re: philosophy, "Greeks",
 is \N for xml and plain text in 2011-07-23. that sucks
 
 in fact there are 13065 blank for 2011-07-08 & 13278 blank for 2011-07-23; wonder if greeks is also blank in 2011-07-08?
-turns out it is... how about 2011-06-26?
+turns out it is... how about 2011-06-26? blank too..
+
+so might give up on freebase dump, how about more official wiki dump?
+
+wget http://download.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2
+
+7gb; ont big xml file
+
+sampling a bit...
+
+------------------------------
+
+  <page>
+    <title>AccessibleComputing</title>
+    <id>10</id>
+    <redirect />
+    <revision>
+      <id>381202555</id>
+      <timestamp>2010-08-26T22:38:36Z</timestamp>
+      <contributor>
+        <username>OlEnglish</username>
+        <id>7181920</id>
+      </contributor>
+      <minor />
+      <comment>[[Help:Reverting|Reverted]] edits by [[Special:Contributions/76.28.186.133|76.28.186.133]] ([[User talk:76.28.186.133|talk]]) to last version by Gurch</comment>
+      <text xml:space="preserve">#REDIRECT [[Computer accessibility]] {{R from CamelCase}}</text>
+    </revision>
+  </page>
+
+redirect from AccessibleComputing -> Computer accessibility
+
+- want to collapse page -> /page into a single line for processing
+- if <text> starts with #REDIRECT then process as redirect
+
+----------------------
+
+  <page>
+    <title>Anarchism</title>
+    <id>12</id>
+    <revision>
+      <id>442817224</id>
+      <timestamp>2011-08-03T09:10:07Z</timestamp>
+      <contributor>
+        <username>Eduen</username>
+        <id>7527773</id>
+      </contributor>
+      <comment>Emma Goldman identifying anarchy as more than no state</comment>
+      <text xml:space="preserve">{{Redirect|Anarchist|the fictional character|Anarchist (comics)}}
+{{Redirect|Anarchists}}
+{{Anarchism sidebar}}
+
+'''Anarchism''' is a [[political philosophy]] which considers the [[state (polity)|state]] undesirable, unnecessary, and harmful, and instead promotes a [[stateless society]], or [[anarchy]].&lt;ref name=&quot;definition&quot;&gt;
+
+- in text
+-- remove all {{..}}
+-- look for first instance of [[.*?]]
+
+Anarchism -> political philosophy (though page is 'Political philosophy'
+
+---------------------------
+
+  <page>
+    <title>Autism</title>
+    <id>25</id>
+    <revision>
+      <id>440170653</id>
+      <timestamp>2011-07-18T19:18:21Z</timestamp>
+      <contributor>
+        <username>GrouchoBot</username>
+        <id>8453292</id>
+      </contributor>
+      <minor />
+      <comment>r2.6.4) (robot Adding: [[kk:Аутизм]]</comment>
+      <text xml:space="preserve">{{pp-semi-indef}}
+{{dablink|This article is about the classic autistic disorder; some writers use the word ''autism'' when referring to the range of disorders on the [[autism spectrum]] or to the various [[pervasive developmental disorder]]s.&lt;ref name=Caronna/&gt;}}
+{{pp-move-indef}}
+&lt;!-- NOTES:
+1) Please follow the Wikipedia style guidelines for editing medical articles [[WP:MEDMOS]].
+2) Use &lt;ref&gt; for explicitly cited references.
+3) Reference anything you put here with notable references, as this subject tends to attract a lot of controversy.--&gt;
+{{pp-move-indef}}
+{{Infobox Disease
+ | Name = Autism
+ | Image = Autism-stacking-cans 2nd edit.jpg
+ | Alt = Young red-haired boy facing away from camera, stacking a seventh can atop a column of six food cans on the kitchen floor. An open pantry contains many more cans.
+ | Caption = Repetitively stacking or lining up objects is a behavior occasionally associated with individuals with autism.
+ | DiseasesDB = 1142
+ | ICD10 = {{ICD10|F|84|0|f|80}}
+ | ICD9 =  299.00
+ | ICDO =
+ | OMIM =  209850
+ | MedlinePlus = 001526
+ | eMedicineSubj = med
+ | eMedicineTopic = 3202
+ | eMedicine_mult = {{eMedicine2|ped|180}}
+ | MeshID = D001321
+ | GeneReviewsID   = autism-overview
+ | GeneReviewsName = Autism overview
+}}
+'''Autism''' is a [[Neurodevelopmental disorder|disorder of neural development]] characterized by impaired ....
+
+Autism -> Neurodevelopmental disorder
+
+- look for text
+-- remove {{.*}}
+-- look for first [[ ]], might include |
+
+------------------------
+
+  <page>
+    <title>Alchemy</title>
+    <id>573</id>
+    <restrictions>move=:edit=</restrictions>
+    <revision>
+      <id>442807146</id>
+      <timestamp>2011-08-03T07:28:33Z</timestamp>
+      <contributor>
+        <username>Huntster</username>
+        <id>92632</id>
+      </contributor>
+      <minor />
+      <comment>Reverted 1 edit by [[Special:Contributions/75.65.177.88|75.65.177.88]] ([[User talk:75.65.177.88|talk]]) identified as [[WP:VAND|vandalism]] to last revision by Captainmighty. ([[WP:TW|TW]])</comment>
+      <text xml:space="preserve">{{Redirect|Alchemist}}
+{{Other uses}}
+
+[[File:Raimundus Lullus alchemic page.jpg|thumb|right|Page from alchemic treatise of [[Ramon Llull]], 16th century]]
+
+'''Alchemy''' is an ancient [[tradition]], the primary objective of which was the
+
+Alchemy -> tradtion
+
+- can't just look for first [[ since it would pick up this meta file
+- do we need to look for '''? or ignore [[File: ?
+
+---------------------------------------------
+
+  <page>
+    <title>A</title>
+      ....
+      <comment>r2.7.1) (robot Adding: [[nap:A]]</comment>
+      <text xml:space="preserve">{{Dablink|Due to [[Wikipedia:Naming conventions (technical restrictions)#Forbidden characters|technical restrictions]], A# redirects here. For other uses, see [[A-sharp (disambiguation)]].}}
+{{pp-move-indef}}
+{{Two other uses|the letter|the indefinite article|A and an}}
+{{Latin alphabet navbox|uc=A|lc=a}}
+'''A''' ({{IPAc-en|En-us-A.ogg|eɪ}}; [[English_alphabet#Letter_names|named]] ''a'', plural ''aes'')&lt;ref name=&quot;OED&quot;/&gt; is the first [[Letter (alphabet)|letter]] and a [[vowel]] in the [[basic modern Latin alphabet]]. It is similar to the Ancient Greek letter [[Alpha]], from which it derives.
+
+plaing text is
+ A (named a, plural aes) is the first letter and a vowel
+
+unsure if i want English_alphabet or Letter
+
+in either case shows need for understanding # in [[English_alphabet#Letter_names|named]]
+
+--------------------------------
+
+ <page>
+    <title>Alabama</title>
+      ...
+      <comment>Undid revision 442794985 by [[Special:Contributions/76.73.178.189|76.73.178.189]] ([[User talk:76.73.178.189|talk]])</comment>
+      <text xml:space="preserve">{{About|the U.S. state of Alabama|the river|Alabama River|other uses|Alabama (disambiguation)}}
+{{pp-move-indef}}
+{{Infobox U.S. state
+ |Name = Alabama
+ |Fullname = State of Alabama
+ |Flag = Flag of Alabama.svg
+ |Flaglink = [[Flag of Alabama|Flag
+ .....
+ |Route Marker = Alabama 67.svg
+ |Quarter = 2003 AL Proof.png
+ |QuarterReleaseDate = 2003
+}}
+
+'''Alabama''' ({{IPAc-en|en-us-Alabama.ogg|ˌ|æ|l|ə|ˈ|b|æ|m|ə}}) is a [[U.S. state|state]] located in the [[Southern United States|southeastern region]] of 
+
+Alabama -> U.S. state
+
+-----------------------------
+
+  <page>
+    .....
+      <comment>Corrected Greek spelling to be consistent with more modern and graphically accurate rendering of kappa as 'k.'</comment>
+      <text xml:space="preserve">{{Redirect|Achilleus|the emperor with this name|Achilleus (emperor)|other uses|Achilles (disambiguation)}}
+[[Image:Leon Benouville The Wrath of Achilles.jpg|thumb|''The Wrath of Achilles'', by [[François-Léon Benouville]] (1821–1859) ([[Musée Fabre]])]]
+
+In [[Greek mythology]], '''Achilles''' ([[Ancient Greek]]: {{polytonic|Ἀχιλλεύς}}, ''Akhille
+
+first case of link _before_ '''d term
+no guarentee there even will be a ''' term i guess...
+feels like simplest way is parse [['s, one at a time, and ignore those with [[??:  treating the : as a meta char?
+
+--------------------------------------
+
+  <page>
+    <title>Actrius</title>
+    <id>330</id>
+    <revision>
+      ....
+|country             = [[Spain]]
+|production_company  = [[Els Films de la Rambla, S.A.]]
+}}
+
+'''''Actrius''''' ([[Catalan language|Catalan]]: ''Actresses'') is a [[1996 in film|1996 film]] directed by [[Ventura Pons]]. In the film, there are no male actors and the four leading actresses dubbed themselves in the Castilian version.
+
+again, should it be 'Catalan language' or '1996 in film'
+i think the second is better
+
+- ignore things in brackets
+
+unsure whether to just do processing in place or to split out
+
+if splitting first pass would have to be strip to make one page per line...
+
