@@ -26,5 +26,9 @@ public class TokenDictionary {
   public String prettyEdgeForIdxs(int idx1, int idx2) {
     return "[" + tokenForIdx(idx1) + "] -> [" + tokenForIdx(idx2) + "]";
   }
+
+  public String outputEdgeForIdxs(int idx1, int idx2) {
+    return tokenForIdx(idx1) + "\t" + tokenForIdx(idx2);
+  }
   
 }

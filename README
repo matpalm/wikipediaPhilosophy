@@ -550,3 +550,15 @@ Map input bytes 	   55,825,702,860 		0	55,825,702,860
 Map output records 	   3,523,628 			0 	3,523,628
 Combine input records 	   0 				0 	0
 Reduce input records 	   0 				3,523,628	3,523,628
+
+rewrote article parser, much much simpler now. rerun from scratch
+
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+  -input /full/2011-07-23/articles/ -output /full/2011-07-23/edges \
+  -mapper '/usr/bin/python articleParser.py' -file articleParser.py
+
+found a big problem, one of the major links re: philosophy, "Greeks", 
+is \N for xml and plain text in 2011-07-23. that sucks
+
+in fact there are 13065 blank for 2011-07-08 & 13278 blank for 2011-07-23; wonder if greeks is also blank in 2011-07-08?
+turns out it is... how about 2011-06-26?
