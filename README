@@ -769,7 +769,28 @@ i think the second is better
 
 - ignore things in brackets
 
-unsure whether to just do processing in place or to split out
 
-if splitting first pass would have to be strip to make one page per line...
+
+-- 
+
+anyways, first flatten to one line per page with flattenToOnePagePerLine.py
+
+ time cat enwiki-latest-pages-articles.xml | ~/flattenToOnePagePerLine.py > enwiki-latest-pages-articles.pageperline.xml
+
+split into redirects and articles
+
+ cat enwiki-latest-pages-articles.pageperline.xml | grep \<redirect\ \/\>.*#REDIRECT > enwiki-latest-pages-articles.pageperline.redirects.xml &
+ cat enwiki-latest-pages-articles.pageperline.xml | grep -v \<redirect\ \/\>.*#REDIRECT > enwiki-latest-pages-articles.pageperline.articles.xml &
+
+wc -l redirects 4607243
+wc -l articles  6877360
+
+parse redirects
+ time cat enwiki-latest-pages-articles.pageperline.redirects.xml | ~/wikimedia/parseRedirects.py \
+  >enwiki-latest-pages-articles.pageperline.redirects 2>enwiki-latest-pages-articles.pageperline.redirects.err
+
+parse articles
+ time cat enwiki-latest-pages-articles.pageperline.articles.xml | ~/wikimedia/articleParser.py >articleParser.out 2>articleParser.err
+
+
 
