@@ -8,12 +8,27 @@ class LinkParser(BeautifulStoneSoup):
         'link': ['link']
     }
 
-def first_valid_link(links):
+def meta_link(link):
+    return ':' in link
+
+def internal_link(link):
+    return link.startswith('#')
+
+def first_valid_link(links, title):
     for link in links:
         link_text = link.text
-        if not ":" in link_text:
+        if not (meta_link(link_text) or internal_link(link_text) or link_text.startswith(title)):
             return link_text
+        print "ignoring link", link
     return None
+
+def replace_nested(regex, text):
+    while True:
+        original = text
+        text = regex.sub(' ', text)
+        print "text2 ", text[0:1000].encode('utf-8')
+        if original == text:
+            return text
 
 for line in fileinput.input():
     try:
@@ -26,33 +41,18 @@ for line in fileinput.input():
         print "text1 ", text[0:1000].encode('utf-8')
 
         # remove all (nested) { }s
-        keep_replacing = True
-        while keep_replacing:
-            original = text
-            text = re.sub(r'{[^{]*?}', ' ', text)
-            print "text2a ", text[0:1000].encode('utf-8')
-            keep_replacing = (original != text)
-            print "keep_replacing a", keep_replacing
+        text = replace_nested(re.compile('{[^{]*?}'), text)
 
         # remove all (nested) ( )s
-        keep_replacing = True
-        while keep_replacing:
-            original = text
-            text = re.sub(r'\([^\(]*?\)', ' ', text)
-            print "text2b ", text[0:1000].encode('utf-8')
-            keep_replacing = (original != text)
-            print "keep_replacing b", keep_replacing
+        text = replace_nested(re.compile('\([^\(]*?\)'), text)
 
-        # remove all italicy, boldy things
-        text = re.sub(r'\'\'[^\']*?\'\'', ' ', text)
-
-        # unescape all XML 
-        text = unescape(text, {"&apos;": "'", "&quot;": '"'}) 
-        print "text3 ", text[0:1000].encode('utf-8')
+        # unescape all XML (this includes comments for the next section)
+        text = unescape(text, {"&apos;": "'", "&quot;": '"'})
+        print "text3", text[0:1000].encode('utf-8')
 
         # remove all comments
         text = re.sub(r'<!--.*?-->', ' ', text)
-        print "text4 ", text[0:1000].encode('utf-8')
+        print "text4", text[0:1000].encode('utf-8')
 
         # we are now looking for the first [[link]]
         # a big problem is that links can be nested; 
@@ -60,13 +60,24 @@ for line in fileinput.input():
         # and in this case we want to ignore both the Image:foo.jpg _and_ the [[link]] since it's nested in the image one
         # we do this by converting [[blah]] to <link>blah</link> so we can do it with soup
         text = re.sub('\[\[','<link>', re.sub('\]\]','</link>', text))
-        print "text5 ", text[0:1000].encode('utf-8')
+        print "text5", text.encode('utf-8')
+
+        # for some reason, no idea why, self closed tags, like ref in the following link
+        #  <ref name="OED"/> is the first <link>Letter  |letter</link> and a <link>vowel</link> in the
+        # cause parsedLinks.findAll recursive false to return nothing for links?
+        text = re.sub('<[^<]*/>', ' ', text)
+        print "text6", text.encode('utf-8')
     
         # parse for <link> (being sure to handle recursive case) 
         # and pick first one
         parsedLinks = LinkParser(text)
-        links = parsedLinks.findAll('link',recursive=False)
-        link = first_valid_link(links)            
+        links = parsedLinks.findAll('link', recursive=False)
+        print "links", links
+        if not links:
+            sys.stderr.write("ERROR can't find _any_ links for ["+title.encode('utf-8')+"] :(\n")
+            break
+            
+        link = first_valid_link(links, title)
         if not link:
             sys.stderr.write("ERROR can't find valid link for ["+title.encode('utf-8')+"] :(\n")
             break
