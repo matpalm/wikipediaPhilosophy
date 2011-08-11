@@ -25,11 +25,11 @@ for line in fileinput.input():
         text = xml.find('text').string    
         print "text1 ", text[0:1000].encode('utf-8')
 
-        # remove all (nested) {{ }}s
+        # remove all (nested) { }s
         keep_replacing = True
         while keep_replacing:
             original = text
-            text = re.sub(r'{{[^{]*?}}', ' ', text)
+            text = re.sub(r'{[^{]*?}', ' ', text)
             print "text2a ", text[0:1000].encode('utf-8')
             keep_replacing = (original != text)
             print "keep_replacing a", keep_replacing
@@ -42,6 +42,9 @@ for line in fileinput.input():
             print "text2b ", text[0:1000].encode('utf-8')
             keep_replacing = (original != text)
             print "keep_replacing b", keep_replacing
+
+        # remove all italicy, boldy things
+        text = re.sub(r'\'\'[^\']*?\'\'', ' ', text)
 
         # unescape all XML 
         text = unescape(text, {"&apos;": "'", "&quot;": '"'}) 
