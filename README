@@ -768,29 +768,108 @@ again, should it be 'Catalan language' or '1996 in film'
 i think the second is better
 
 - ignore things in brackets
-
-
-
 -- 
 
-anyways, first flatten to one line per page with flattenToOnePagePerLine.py
+elastic-mapreduce -c ~/security/credentials.json --create --alive \
+ --master-instance-type cc1.4xlarge --slave-instance-type cc1.4xlarge --instance-count 3 \
+ --bootstrap-action s3://beta.elasticmapreduce/bootstrap-actions/install-ganglia \
+ --bootstrap-action s3://elasticmapreduce/bootstrap-actions/configurations/latest/memory-intensive \
+ --bootstrap-action s3://mkelcey/wikipediaPhilosophy/install_beautiful_soup.sh \
+ --pig-interactive --name mkelcey_1313088555
 
- time cat enwiki-latest-pages-articles.xml | ~/flattenToOnePagePerLine.py > enwiki-latest-pages-articles.pageperline.xml
+
+walking from slayer i see...
+http://en.wikipedia.org/wiki/Slayer
+http://en.wikipedia.org/wiki/Thrash_metal
+http://en.wikipedia.org/wiki/Heavy_metal_music
+http://en.wikipedia.org/wiki/Rock_music
+http://en.wikipedia.org/wiki/Popular_music
+http://en.wikipedia.org/wiki/Musical_genre
+http://en.wikipedia.org/wiki/Genres
+http://en.wikipedia.org/wiki/Literature
+http://en.wikipedia.org/wiki/Latin
+http://en.wikipedia.org/wiki/Italic_language
+http://en.wikipedia.org/wiki/Indo-European_languages
+http://en.wikipedia.org/wiki/Language_family
+http://en.wikipedia.org/wiki/Language
+http://en.wikipedia.org/wiki/Human
+http://en.wikipedia.org/wiki/Taxonomy
+http://en.wikipedia.org/wiki/Ancient_Greek
+http://en.wikipedia.org/wiki/Archaic_Greece
+gets a bit fuzzy...
+
+setup
+ sudo apt-get install emacs22-nox
+
+get data
+ wget http://download.wikimedia.org/enwiki/20110722/enwiki-20110722-pages-articles.xml.bz2   # 7.1gb
+
+flatten to single line
+ bzcat enwiki-20110722-pages-articles.xml.bz2 | ~/flattenToOnePagePerLine.py > enwiki-20110722-pages-articles.pageperline.xml # 30gb
 
 split into redirects and articles
+ cat enwiki-20110722-pages-articles.pageperline.xml | grep \<redirect\ \/\> > enwiki-20110722-pages-redirects.xml &   
+ cat enwiki-20110722-pages-articles.pageperline.xml | grep -v \<redirect\ \/\> > enwiki-20110722-pages-articles.xml & 
 
- cat enwiki-latest-pages-articles.pageperline.xml | grep \<redirect\ \/\>.*#REDIRECT > enwiki-latest-pages-articles.pageperline.redirects.xml &
- cat enwiki-latest-pages-articles.pageperline.xml | grep -v \<redirect\ \/\>.*#REDIRECT > enwiki-latest-pages-articles.pageperline.articles.xml &
+wc -l redirects 5177302
+wc -l articles  6307301
 
-wc -l redirects 4607243
-wc -l articles  6877360
+move xml for articles and redirects into hdfs 
+ hadoop fs -mkdir /full/articles.xml
+ hadoop fs -copyFromLocal /mnt/enwiki-20110722-pages-articles.xml /full/articles.xml
+ hadoop fs -mkdir /full/redirects.xml
+ hadoop fs -copyFromLocal /mnt/enwiki-20110722-pages-redirects.xml /full/redirects.xml
 
 parse redirects
- time cat enwiki-latest-pages-articles.pageperline.redirects.xml | ~/wikimedia/parseRedirects.py \
-  >enwiki-latest-pages-articles.pageperline.redirects 2>enwiki-latest-pages-articles.pageperline.redirects.err
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+  -input /full/redirects.xml -output /full/redirects \
+  -mapper redirectParser.py -file redirectParser.py
 
 parse articles
- time cat enwiki-latest-pages-articles.pageperline.articles.xml | ~/wikimedia/articleParser.py >articleParser.out 2>articleParser.err
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+  -input /full/articles.xml -output /full/edges \
+  -mapper articleParser.py -file articleParser.py
+
+dereference redirects
+ pig -p INPUT=/full/edges -p OUTPUT=/full/edges.dereferenced1 -f dereference_redirects.pig
+
+and again (to check there are no double redirects)
+ pig -p INPUT=/full/edges.dereferenced1 -p OUTPUT=/full/edges.dereferenced2 -f dereference_redirects.pig
+
+hfs -cat /full/edges/* | sort > /mnt/edges
+hfs -cat /full/edges.dereferenced1/* | sort > /mnt/edges.dereferenced1
+hfs -cat /full/edges.dereferenced2/* | sort > /mnt/edges.dereferenced2
+ 
+/mnt/edges.dereferenced1 & /mnt/edges.dereferenced2 same size, 
+but md5sum different?
+and diff shows "difference"? must be whitespace or unicode weirdness... looks good enough...
+hadoop@ip-10-17-178-207:/mnt$ diff edges.dereferenced[12]
+121977d121976
+< 6₂ knot       Knot theory
+121978a121978
+> 6₂ knot       Knot theory
+254926d254925
+< A♭ (musical note)     Semitone
+254927a254927
+> A♭ (musical note)     Semitone
+1295453d1295452
+< G♭ (musical note)     Semitone
+
+-- do the walk!
+
+ java -Xmx8g -cp . DistanceToPhilosophy Philosophy /mnt/edges.dereferenced1 \
+  >DistanceToPhilosophy.stdout 2>DistanceToPhilosophy.stderr 
+
+Slayer -> Thrash metal -> Heavy metal music -> Rock music -> Popular music -> Music genre -> genre
+
+and not uppercased :( missed that somehow
+it's at least in the redirects; Genres -> genre
+
+so need to
+1) reparse redirects
+2) rejoin original edges to redirects
+3) redo walk
+
 
 
 

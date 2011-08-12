@@ -8,25 +8,34 @@ class LinkParser(BeautifulStoneSoup):
         'link': ['link']
     }
 
-def meta_link(link):
+def meta_article(link):
     return ':' in link
 
 def internal_link(link):
     return link.startswith('#')
 
 def first_valid_link(links, title):
-    for link in links:
-        link_text = link.text
-        if not (meta_link(link_text) or internal_link(link_text) or link_text.startswith(title)):
-            return link_text
-        print "ignoring link", link
+    for link_node in links:
+        link = link_node.text
+#        print "raw link",link.encode('utf-8')
+        link = re.sub(r'[\#\|].*','', link)
+#        print "link sans anchor", link.encode('utf-8')
+        link = re.sub('_',' ', link)
+#        print "link sans _", link.encode('utf-8')
+        if not link:
+            continue
+        link = link[0].upper() + link[1:] # make sure it's first letter capital
+#        print "link upper", link.encode('utf-8')
+        if not (meta_article(link) or internal_link(link) or link==title):
+            return link
+#        print "ignoring link", link.encode('utf-8')
     return None
 
 def replace_nested(regex, text):
     while True:
         original = text
         text = regex.sub(' ', text)
-        print "text2 ", text[0:1000].encode('utf-8')
+#        print "text2 ", text[0:1000].encode('utf-8')
         if original == text:
             return text
 
@@ -35,24 +44,45 @@ for line in fileinput.input():
         xml = BeautifulStoneSoup(line)
 
         title = xml.find('title').string
-        print "START title", title.encode('utf-8')
+#        print "START title", title.encode('utf-8')
+
+        if (meta_article(title)):
+            sys.stderr.write("reporter:counter:parse,ignore_meta_article,1\n")
+            sys.stderr.write("ignore meta article ["+title.encode('utf-8')+"]\n")
+            continue
 
         text = xml.find('text').string    
-        print "text1 ", text[0:1000].encode('utf-8')
+#        print "text1 ", text[0:1000].encode('utf-8')
 
         # remove all (nested) { }s
         text = replace_nested(re.compile('{[^{]*?}'), text)
-
+#        print "text2 ", text[0:1000].encode('utf-8')
         # remove all (nested) ( )s
-        text = replace_nested(re.compile('\([^\(]*?\)'), text)
+        # cant just remove all () since it removes () from links eg Letter_(Alphabet)
+        # text = replace_nested(re.compile('\([^\(]*?\)'), text)
 
         # unescape all XML (this includes comments for the next section)
         text = unescape(text, {"&apos;": "'", "&quot;": '"'})
-        print "text3", text[0:1000].encode('utf-8')
+#        print "text3 ", text[0:1000].encode('utf-8')
 
-        # remove all comments
+        # remove all comments (never nested)
         text = re.sub(r'<!--.*?-->', ' ', text)
-        print "text4", text[0:1000].encode('utf-8')
+#        print "text4 ", text[0:1000].encode('utf-8')
+
+        # for some reason, no idea why, self closed tags, like ref in the following link
+        #  <ref name="OED"/> is the first <link>Letter  |letter</link> and a <link>vowel</link> in the
+        # cause parsedLinks.findAll recursive false to return nothing for links?
+        text = re.sub('<[^<]*/>', ' ', text)
+#        print "text7 ", text[0:1000].encode('utf-8')
+
+        # refs cause no end of grief to beautiful soup (see physics.eg) ditch them all
+        # (and i dont think they are ever nested)
+        text = re.sub(r'<ref[\ >].*?</ref>', ' ', text)
+#        print "text4b", text[0:1000].encode('utf-8')
+
+        # and pres cause some problems too (see fidonet.eg)
+        text = re.sub(r'<pre[\ >].*?</pre>', ' ', text)
+#        print "text4c", text[0:1000].encode('utf-8')
 
         # we are now looking for the first [[link]]
         # a big problem is that links can be nested; 
@@ -60,43 +90,42 @@ for line in fileinput.input():
         # and in this case we want to ignore both the Image:foo.jpg _and_ the [[link]] since it's nested in the image one
         # we do this by converting [[blah]] to <link>blah</link> so we can do it with soup
         text = re.sub('\[\[','<link>', re.sub('\]\]','</link>', text))
-        print "text5", text.encode('utf-8')
+#        print "text5 ", text[0:1000].encode('utf-8')
 
-        # for some reason, no idea why, self closed tags, like ref in the following link
-        #  <ref name="OED"/> is the first <link>Letter  |letter</link> and a <link>vowel</link> in the
-        # cause parsedLinks.findAll recursive false to return nothing for links?
-        text = re.sub('<[^<]*/>', ' ', text)
-        print "text6", text.encode('utf-8')
+        # remove links in ( )s
+        # primarily this is to address the common case of 
+        #  foo (some other <link>bar</link) and then the <link>rest</link>...
+        # where the first link in brackets (bar) is not a good choice
+        # this re is a bit funky, needs some more examples me thinks.. (a.eg and allah.eg have been interesting cases)
+        text = re.sub(r'\(([^\(\)]*?)<link>(.*?)</link>(.*?)\)', ' ', text)
+#        print "textX ", text[0:200].encode('utf-8')
     
-        # parse for <link> (being sure to handle recursive case) 
-        # and pick first one
-        parsedLinks = LinkParser(text)
-        links = parsedLinks.findAll('link', recursive=False)
-        print "links", links
+        # parse for <link> (being sure to handle recursive case) and pick first one
+        links = LinkParser(text).findAll('link', recursive=False)
         if not links:
-            sys.stderr.write("ERROR can't find _any_ links for ["+title.encode('utf-8')+"] :(\n")
-            break
-            
+            # occasionally some wikipedia articles are wrapped in <html><body>, or have bizarre stray br's or something.
+            # non recursive findall fails on this
+            # ( there's probably a way to config this to be allowed but more hacktastic to just remove them in this case )
+            # ( perhaps even just trim away _all_ non link tags? down that path lies madness, really need to sort out the find... )
+            for tag in ['html','body','noinclude','br']:
+                text = re.sub('<'+tag+'>',' ',text)
+            links = LinkParser(text).findAll('link', recursive=False)
+            if not links:
+                sys.stderr.write("reporter:counter:parse,cant_find_any_links,1\n")
+                sys.stderr.write("ERROR _still_ can't find _any_ links for ["+title.encode('utf-8')+"]; try to trim html/body \n")                
+                continue            
+#        print "links", links
+
         link = first_valid_link(links, title)
         if not link:
+            sys.stderr.write("reporter:counter:parse,no_valid_links,1\n")
             sys.stderr.write("ERROR can't find valid link for ["+title.encode('utf-8')+"] :(\n")
-            break
-        print "link", link.encode('utf-8')
+            continue
 
-        # clean link up; anchors, _s, etc
-        link = re.sub(r'[\#\|].*','', link)
-        print "link sans anchor", link.encode('utf-8')
-        link = re.sub('_',' ', link)
-        print "link sans _", link.encode('utf-8')
-        link = link[0].upper() + link[1:] # make sure it's first letter capital
-        print "link upper", link.encode('utf-8')
-        
         # done
-        print ("FINAL\t"+title+"\t"+link).encode('utf-8')
+        print (title+"\t"+link.strip()).encode('utf-8')
 
-#    output = title + "\t" + first_link
-#    output_unescaped = unescape(output, {"&apos;": "'", "&quot;": '"'})        
-#    print output_unescaped.encode('utf-8')
     except:
+        sys.stderr.write("reporter:counter:parse,exception_parsing_article,1\n")
         sys.stderr.write("ERROR problem processing article for ["+title.encode('utf-8')+"] "+str(sys.exc_info()[0])+"\n")
         traceback.print_exc(file=sys.stderr)
