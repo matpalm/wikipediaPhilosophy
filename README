@@ -830,15 +830,29 @@ parse articles
   -input /full/articles.xml -output /full/edges \
   -mapper articleParser.py -file articleParser.py
 
+  parse	
+	exception_parsing_article=29
+	no_valid_links=18902
+	cant_find_any_links=2002
+	ignore_meta_article=2593294
+
+
+
 dereference redirects
  pig -p INPUT=/full/edges -p OUTPUT=/full/edges.dereferenced1 -f dereference_redirects.pig
 
 and again (to check there are no double redirects)
  pig -p INPUT=/full/edges.dereferenced1 -p OUTPUT=/full/edges.dereferenced2 -f dereference_redirects.pig
 
-hfs -cat /full/edges/* | sort > /mnt/edges
-hfs -cat /full/edges.dereferenced1/* | sort > /mnt/edges.dereferenced1
-hfs -cat /full/edges.dereferenced2/* | sort > /mnt/edges.dereferenced2
+and again (to check there are no double redirects)
+/* pig -p INPUT=/full/edges.dereferenced2 -p OUTPUT=/full/edges.dereferenced3 -f dereference_redirects.pig
+
+looks like a job for iterative pig 0.9 :) !
+
+get results locally to check them
+ hfs -cat /full/edges/* | sort > /mnt/edges &
+ hfs -cat /full/edges.dereferenced1/* | sort > /mnt/edges.dereferenced1 &
+ hfs -cat /full/edges.dereferenced2/* | sort > /mnt/edges.dereferenced2 &
  
 /mnt/edges.dereferenced1 & /mnt/edges.dereferenced2 same size, 
 but md5sum different?
@@ -857,18 +871,31 @@ hadoop@ip-10-17-178-207:/mnt$ diff edges.dereferenced[12]
 
 -- do the walk!
 
- java -Xmx8g -cp . DistanceToPhilosophy Philosophy /mnt/edges.dereferenced1 \
+ time java -Xmx8g -cp . DistanceToPhilosophy Philosophy /mnt/edges.dereferenced3 \
   >DistanceToPhilosophy.stdout 2>DistanceToPhilosophy.stderr 
 
-Slayer -> Thrash metal -> Heavy metal music -> Rock music -> Popular music -> Music genre -> genre
+./explorer.py
 
-and not uppercased :( missed that somehow
-it's at least in the redirects; Genres -> genre
+Slayer -> Thrash metal -> Heavy metal music -> Rock music -> Popular music -> Music genre -> Genre -> Literature -> Letter (alphabet) -> Grapheme -> Writing system -> Symbolic system -> Psychology -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
 
-so need to
-1) reparse redirects
-2) rejoin original edges to redirects
-3) redo walk
+Beer -> Alcoholic beverage -> Drink -> Liquid -> State of matter -> Phase (matter) -> Outline of physical science -> Natural science -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+Linux -> Unix-like -> Operating system -> Computer software -> Computer program -> Instruction set -> Computer architecture -> Computer science -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+Parachuting -> Parachute -> Atmosphere -> Gas -> State of matter -> Phase (matter) -> Outline of physical science -> Natural science -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+Bad Religion -> Punk rock -> Rock music -> Popular music -> Music genre -> Genre -> Literature -> Letter (alphabet) -> Grapheme -> Writing system -> Symbolic system -> Psychology -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+Vegemite -> Yeast extract -> Yeast -> Eukaryote -> Organism -> Biology -> Natural science -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+Hobart -> List of Australian capital cities -> States and territories of Australia -> Australia -> Southern Hemisphere -> Earth -> Planet -> Orbit -> Physics -> Natural science -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+some quirks;
+ Natural science -> Branch_(academia) in live
+ Fact -> Truth
+
+
+dot -Tpng < graph.dot > graph.png
 
 
 
