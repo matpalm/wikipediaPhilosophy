@@ -50,6 +50,8 @@ public class DistanceToPhilosophy {
       int fromNode = tokenDictionary.idxForToken(cols[1]);
       int toNode = tokenDictionary.idxForToken(cols[0]);      
       
+      if (cols[0].contains("Antwerp") || cols[1].contains("Antwerp")) 
+        System.err.println("ANTWERP ["+cols[1]+"] -> ["+cols[0]+"]");      
       nodes.add(fromNode);
       nodes.add(toNode);
       
