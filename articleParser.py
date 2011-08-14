@@ -39,11 +39,14 @@ def replace_nested(regex, text):
         if original == text:
             return text
 
+def unescape_full(text):
+    return unescape(text, {"&apos;": "'", "&quot;": '"'})
+
 for line in fileinput.input():
     try:
         xml = BeautifulStoneSoup(line)
 
-        title = xml.find('title').string
+        title = unescape_full(xml.find('title').string)
 #        print "START title", title.encode('utf-8')
 
         if (meta_article(title)):
@@ -63,7 +66,7 @@ for line in fileinput.input():
         # text = replace_nested(re.compile('\([^\(]*?\)'), text)
 
         # unescape all XML (this includes comments for the next section)
-        text = unescape(text, {"&apos;": "'", "&quot;": '"'})
+        text = unescape_full(text)
 #        sys.stderr.write("text3 "+text[0:800].encode('utf-8')+"\n")
 
         # remove stray quotes (plays havok with italics and bold removal
