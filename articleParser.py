@@ -52,18 +52,25 @@ for line in fileinput.input():
             continue
 
         text = xml.find('text').string    
-#        print "text1 ", text[0:1000].encode('utf-8')
+#        sys.stderr.write("text1 "+text[0:800].encode('utf-8')+"\n")
 
         # remove all (nested) { }s
         text = replace_nested(re.compile('{[^{]*?}'), text)
-#        print "text2 ", text[0:1000].encode('utf-8')
+#        sys.stderr.write("text2 "+text[0:800].encode('utf-8')+"\n")
+
         # remove all (nested) ( )s
         # cant just remove all () since it removes () from links eg Letter_(Alphabet)
         # text = replace_nested(re.compile('\([^\(]*?\)'), text)
 
         # unescape all XML (this includes comments for the next section)
         text = unescape(text, {"&apos;": "'", "&quot;": '"'})
-#        print "text3 ", text[0:1000].encode('utf-8')
+#        sys.stderr.write("text3 "+text[0:800].encode('utf-8')+"\n")
+
+        # remove italics and bold
+        text = re.sub(r"''.*?''", ' ', text)
+#        sys.stderr.write("text3c"+text[0:800].encode('utf-8')+"\n")
+        text = re.sub(r"'''.*?'''", ' ', text)
+#        sys.stderr.write("text3b"+text[0:800].encode('utf-8')+"\n")
 
         # remove all comments (never nested)
         text = re.sub(r'<!--.*?-->', ' ', text)
@@ -90,7 +97,7 @@ for line in fileinput.input():
         # and in this case we want to ignore both the Image:foo.jpg _and_ the [[link]] since it's nested in the image one
         # we do this by converting [[blah]] to <link>blah</link> so we can do it with soup
         text = re.sub('\[\[','<link>', re.sub('\]\]','</link>', text))
-#        print "text5 ", text[0:1000].encode('utf-8')
+#        sys.stderr.write("text5 "+text[0:800].encode('utf-8')+"\n")
 
         # remove links in ( )s
         # primarily this is to address the common case of 
@@ -98,7 +105,7 @@ for line in fileinput.input():
         # where the first link in brackets (bar) is not a good choice
         # this re is a bit funky, needs some more examples me thinks.. (a.eg and allah.eg have been interesting cases)
         text = re.sub(r'\(([^\(\)]*?)<link>(.*?)</link>(.*?)\)', ' ', text)
-#        print "textX ", text[0:200].encode('utf-8')
+#        sys.stderr.write("textX "+text[0:800].encode('utf-8')+"\n")
     
         # parse for <link> (being sure to handle recursive case) and pick first one
         links = LinkParser(text).findAll('link', recursive=False)

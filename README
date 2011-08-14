@@ -836,8 +836,6 @@ parse articles
 	cant_find_any_links=2002
 	ignore_meta_article=2593294
 
-
-
 dereference redirects
  pig -p INPUT=/full/edges -p OUTPUT=/full/edges.dereferenced1 -f dereference_redirects.pig
 
@@ -894,9 +892,39 @@ some quirks;
  Natural science -> Branch_(academia) in live
  Fact -> Truth
 
+having problems around Antwerp
 
-dot -Tpng < graph.dot > graph.png
+path is actually: Antwerp -> Municipality -> Australia -> Southern Hemisphere -> Earth -> Planet -> Orbit -> Physics -> Natural science -> Science
+-> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
 
+but distance lists
+didn't visit antwerp, Municipality, Australia or Southern Hemisphere
+Earth however is , distance 14
 
+there is no edge, Southern Hemisphere -> Earth
+the parser must be broken.
 
+fixed it again, and all article.egs work (from testArticleParser)
 
+run redirects against redirects
+ pig -p INPUT=/full/redirects -p OUTPUT=/full/redirects.dereferenced1 -f dereference_redirects.pig
+ pig -p INPUT=/full/redirects.dereferenced1 -p OUTPUT=/full/redirects.dereferenced2 -f dereference_redirects.pig
+ pig -p INPUT=/full/redirects.dereferenced2 -p OUTPUT=/full/redirects.dereferenced3 -f dereference_redirects.pig
+ pig -p INPUT=/full/redirects.dereferenced3 -p OUTPUT=/full/redirects.dereferenced4 -f dereference_redirects.pig
+ hfs -mv /full/redirects /full/redirects.original
+ hfs -mv /full/redirects.dereferenced4 /full/redirects
+
+run extracrion
+ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+  -input /full/articles.xml -output /full/edges \
+  -mapper articleParser.py -file articleParser.py
+
+run redirects against edges
+ pig -p INPUT=/full/edges -p OUTPUT=/full/edges.dereferenced -f dereference_redirects.pig
+ pig -p INPUT=/full/edges.dereferenced -p OUTPUT=/full/edges.dereferenced2 -f dereference_redirects.pig # sanity check, should be no different
+
+work out which nodes we didn't visit
+ grep ^didnt DistanceToPhilosophy.stdout | sed -es/didnt\ visit\ // > didnt_visit
+
+summarise why we didn't visit them
+ ./walk_till_end.py < didnt_visit > walk_till_end.stdout
