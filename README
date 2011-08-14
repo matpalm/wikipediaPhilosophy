@@ -928,3 +928,12 @@ work out which nodes we didn't visit
 
 summarise why we didn't visit them
  ./walk_till_end.py < didnt_visit > walk_till_end.stdout
+ grep end\ of\ line$ walk_till_end.stdout | cut -f2 | sort | uniq -c | sort -nr | head
+
+  10397 List of United States cities by population
+   6282 Abnormality (behavior)
+   3447 Local development ministry  * no article (live)
+   2062 West Slavs
+   1802 Azana (gnat) * no article (live)
+
+Abnormality is one that i can't see how to fix, the 
