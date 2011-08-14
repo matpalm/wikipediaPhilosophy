@@ -52,11 +52,11 @@ for line in fileinput.input():
             continue
 
         text = xml.find('text').string    
-#        sys.stderr.write("text1 "+text[0:800].encode('utf-8')+"\n")
+        sys.stderr.write("text1 "+text[0:800].encode('utf-8')+"\n")
 
         # remove all (nested) { }s
         text = replace_nested(re.compile('{[^{]*?}'), text)
-#        sys.stderr.write("text2 "+text[0:800].encode('utf-8')+"\n")
+        sys.stderr.write("text2 "+text[0:800].encode('utf-8')+"\n")
 
         # remove all (nested) ( )s
         # cant just remove all () since it removes () from links eg Letter_(Alphabet)
@@ -64,13 +64,13 @@ for line in fileinput.input():
 
         # unescape all XML (this includes comments for the next section)
         text = unescape(text, {"&apos;": "'", "&quot;": '"'})
-#        sys.stderr.write("text3 "+text[0:800].encode('utf-8')+"\n")
+        sys.stderr.write("text3 "+text[0:800].encode('utf-8')+"\n")
 
         # remove italics and bold
         text = re.sub(r"''.*?''", ' ', text)
-#        sys.stderr.write("text3c"+text[0:800].encode('utf-8')+"\n")
+        sys.stderr.write("text3c"+text[0:800].encode('utf-8')+"\n")
         text = re.sub(r"'''.*?'''", ' ', text)
-#        sys.stderr.write("text3b"+text[0:800].encode('utf-8')+"\n")
+        sys.stderr.write("text3b"+text[0:2500].encode('utf-8')+"\n")
 
         # remove all comments (never nested)
         text = re.sub(r'<!--.*?-->', ' ', text)
@@ -97,7 +97,7 @@ for line in fileinput.input():
         # and in this case we want to ignore both the Image:foo.jpg _and_ the [[link]] since it's nested in the image one
         # we do this by converting [[blah]] to <link>blah</link> so we can do it with soup
         text = re.sub('\[\[','<link>', re.sub('\]\]','</link>', text))
-#        sys.stderr.write("text5 "+text[0:800].encode('utf-8')+"\n")
+        sys.stderr.write("text5 "+text[0:800].encode('utf-8')+"\n")
 
         # remove links in ( )s
         # primarily this is to address the common case of 
@@ -105,22 +105,17 @@ for line in fileinput.input():
         # where the first link in brackets (bar) is not a good choice
         # this re is a bit funky, needs some more examples me thinks.. (a.eg and allah.eg have been interesting cases)
         text = re.sub(r'\(([^\(\)]*?)<link>(.*?)</link>(.*?)\)', ' ', text)
-#        sys.stderr.write("textX "+text[0:800].encode('utf-8')+"\n")
+        sys.stderr.write("text6 "+text[0:800].encode('utf-8')+"\n")
+
+        # occasionally some wikipedia articles are wrapped in <html><body>, or have bizarre stray br's or something.
+        # non recursive findall fails on this
+        # ( there's probably a way to config this to be allowed but more hacktastic to just remove them in this case )
+        # ( perhaps even just trim away _all_ non link tags? down that path lies madness, really need to sort out the find... )
+        for tag in ['html','body','noinclude','br','onlyinclude']:
+            text = re.sub('<'+tag+'>',' ',text)
     
         # parse for <link> (being sure to handle recursive case) and pick first one
         links = LinkParser(text).findAll('link', recursive=False)
-        if not links:
-            # occasionally some wikipedia articles are wrapped in <html><body>, or have bizarre stray br's or something.
-            # non recursive findall fails on this
-            # ( there's probably a way to config this to be allowed but more hacktastic to just remove them in this case )
-            # ( perhaps even just trim away _all_ non link tags? down that path lies madness, really need to sort out the find... )
-            for tag in ['html','body','noinclude','br']:
-                text = re.sub('<'+tag+'>',' ',text)
-            links = LinkParser(text).findAll('link', recursive=False)
-            if not links:
-                sys.stderr.write("reporter:counter:parse,cant_find_any_links,1\n")
-                sys.stderr.write("ERROR _still_ can't find _any_ links for ["+title.encode('utf-8')+"]; try to trim html/body \n")                
-                continue            
 #        print "links", links
 
         link = first_valid_link(links, title)
