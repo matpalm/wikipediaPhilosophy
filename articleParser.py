@@ -66,11 +66,16 @@ for line in fileinput.input():
         text = unescape(text, {"&apos;": "'", "&quot;": '"'})
         sys.stderr.write("text3 "+text[0:800].encode('utf-8')+"\n")
 
-        # remove italics and bold
-        text = re.sub(r"''.*?''", ' ', text)
-        sys.stderr.write("text3c"+text[0:800].encode('utf-8')+"\n")
-        text = re.sub(r"'''.*?'''", ' ', text)
-        sys.stderr.write("text3b"+text[0:2500].encode('utf-8')+"\n")
+        # remove stray quotes (plays havok with italics and bold removal
+        text = re.sub(r"[^']'[^']",' ',text)
+        sys.stderr.write("\ntext3a"+text[0:2500].encode('utf-8')+"\n")
+        # sanitize italics and bold
+        text = re.sub(r"'''([^']*?)'''", r" ", text)
+#        text = re.sub("'''","_b_",text)
+        sys.stderr.write("\ntext3b"+text[0:2500].encode('utf-8')+"\n")
+#        text = re.sub("''","_i_",text)
+        text = re.sub(r"''([^']*?)''", r" ", text)
+        sys.stderr.write("\ntext3c"+text[0:2500].encode('utf-8')+"\n")
 
         # remove all comments (never nested)
         text = re.sub(r'<!--.*?-->', ' ', text)
