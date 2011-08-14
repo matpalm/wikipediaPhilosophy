@@ -17,6 +17,7 @@ while True:
     if node=='':
         break
 
+    visited = set()
     while not(node == 'Philosophy' or node == None):
         print node,"->",
         node = edges.get(node)

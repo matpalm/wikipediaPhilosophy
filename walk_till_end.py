@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import fileinput, re, sys
 
-sys.stderr.write("parsing edges\n")
+#sys.stderr.write("parsing edges\n")
 edges = {}
 for line in open('edges'):
     a,b = line.strip().split("\t")
     edges[a] = b
-sys.stderr.write("done\n")
+#sys.stderr.write("done\n")
 
 for node in fileinput.input():
     node = node.strip()
