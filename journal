@@ -952,3 +952,76 @@ after...
 
 run
  cat special_edges_cases >> data/edges
+
+with ' removal
+   6192 Abnormality (behavior)
+   4216 Special administrative region (People s Republic of China)
+   3718 People s Republic of China
+   3447 Local development ministry
+   2063 West Slavs
+   1963 Direct-controlled municipality of the People s Republic of China
+   1800 Azana (gnat)
+   1539 Earth s atmosphere
+   1486 Administrative divisions of the People s Republic of China
+    922 R&B;
+
+-- perhaps time to try a mediawiki parser...
+
+sudo apt-get install libxml2-dev libxslt-dev
+wget http://pypi.python.org/packages/source/m/mwlib/mwlib-0.12.15.zip#md5=fae8cab1ef1421202c734c8c5f12b51a
+unzip mwlib-0.12.15.zip
+cd mwlib-0.12.15
+sudo python setup.py install
+
+from mwlib.uparser import simpleparse
+from BeautifulSoup import BeautifulStoneSoup
+from xml.sax.saxutils import unescape
+file_contents = open('article.egs/arcology.eg','r').read()
+xml = BeautifulStoneSoup(file_contents)
+text = xml.find('text').string
+text = unescape(text, {"&apos;": "'", "&quot;": '"'})
+parsed = simpleparse(text)
+
+from mwlib.uparser import parseString
+from mwlib.xhtmlwriter import MWXHTMLWriter, preprocess
+from BeautifulSoup import BeautifulStoneSoup
+from xml.sax.saxutils import unescape
+file_contents = open('article.egs/arcology.eg','r').read()
+xml = BeautifulStoneSoup(file_contents)
+wikitext = xml.find('text').string
+wikitext = unescape(wikitext, {"&apos;": "'", "&quot;": '"'})
+
+r = parseString(title='', raw=wikitext)
+preprocess(r)
+dbw = MWXHTMLWriter()
+dbw.writeBook(r)
+xml2 = BeautifulStoneSoup(dbw.asstring())
+paras = xml2.findAll('div',{"class":"mwx.paragraph"})
+paras
+
+links = paras[1].findAll('a',{"class":"mwx.link.article"})
+links[0].text
+# but requires upper casing etc
+
+
+a.eg
+- remove { }s
+- recurse Article
+- ignore elements with style ''
+- recurse Node elements
+- if text & includes '(' ignore until next ')'
+- first ArticleLink
+- with previous casing rules etc
+
+albert.eg
+ok; doesnt require { } removal
+
+allah.eg
+- ignore ImageLink
+- recurse Paragraph
+- recurse Style '''
+
+analytic_geometry.eg
+- previous link processing; remove after #, replace _
+- ignore links pointing to self
+

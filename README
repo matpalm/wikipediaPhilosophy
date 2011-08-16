@@ -22,7 +22,7 @@ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
  -input /full/redirects.xml -output /full/redirects \
  -mapper redirectParser.py -file redirectParser.py
 
-# follow all redirects 
+# dereference all redirects to their final targets
 pig -p INPUT=/full/redirects -p OUTPUT=/full/redirects.dereferenced1 -f dereference_redirects.pig
 pig -p INPUT=/full/redirects.dereferenced1 -p OUTPUT=/full/redirects.dereferenced2 -f dereference_redirects.pig
 pig -p INPUT=/full/redirects.dereferenced2 -p OUTPUT=/full/redirects.dereferenced3 -f dereference_redirects.pig
@@ -44,7 +44,10 @@ pig -p INPUT=/full/edges -p OUTPUT=/full/edges.dereferenced -f dereference_redir
 # get to local filesystem
 hadoop fs -cat /full/edges.dereferenced/* > data/edges
 
-# run it up
+# inject special cases
+cat special_edges_cases >> data/edges
+
+# calculate distance from Philosophy
 java -Xmx8g -cp . DistanceToPhilosophy Philosophy data/edges >DistanceToPhilosophy.stdout 2>DistanceToPhilosophy.stderr
 
 # visited vs non visited

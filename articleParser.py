@@ -70,15 +70,16 @@ for line in fileinput.input():
 #        sys.stderr.write("text3 "+text[0:800].encode('utf-8')+"\n")
 
         # remove stray quotes (plays havok with italics and bold removal
-        text = re.sub(r"[^']'[^']",' ',text)
+        text = re.sub(r"([^'])'([^'])",r'\1 \2',text)
 #        sys.stderr.write("\ntext3a"+text[0:2500].encode('utf-8')+"\n")
-        # sanitize italics and bold
-        text = re.sub(r"'''([^']*?)'''", r" ", text)
-#        text = re.sub("'''","_b_",text)
+
+        # remove everything in bold or italics
+        text = re.sub(r"'''''([^']*?)'''''", r" ", text)
 #        sys.stderr.write("\ntext3b"+text[0:2500].encode('utf-8')+"\n")
-#        text = re.sub("''","_i_",text)
-        text = re.sub(r"''([^']*?)''", r" ", text)
+        text = re.sub(r"'''([^']*?)'''", r" ", text)
 #        sys.stderr.write("\ntext3c"+text[0:2500].encode('utf-8')+"\n")
+        text = re.sub(r"''([^']*?)''", r" ", text)
+#        sys.stderr.write("\ntext3d"+text[0:2500].encode('utf-8')+"\n")
 
         # remove all comments (never nested)
         text = re.sub(r'<!--.*?-->', ' ', text)
@@ -88,7 +89,7 @@ for line in fileinput.input():
         #  <ref name="OED"/> is the first <link>Letter  |letter</link> and a <link>vowel</link> in the
         # cause parsedLinks.findAll recursive false to return nothing for links?
         text = re.sub('<[^<]*/>', ' ', text)
-#        print "text7 ", text[0:1000].encode('utf-8')
+#        print "\ntext7 ", text[0:1000].encode('utf-8')
 
         # refs cause no end of grief to beautiful soup (see physics.eg) ditch them all
         # (and i dont think they are ever nested)
@@ -105,7 +106,7 @@ for line in fileinput.input():
         # and in this case we want to ignore both the Image:foo.jpg _and_ the [[link]] since it's nested in the image one
         # we do this by converting [[blah]] to <link>blah</link> so we can do it with soup
         text = re.sub('\[\[','<link>', re.sub('\]\]','</link>', text))
-#        sys.stderr.write("text5 "+text[0:800].encode('utf-8')+"\n")
+#        sys.stderr.write("\ntext5 "+text[0:800].encode('utf-8')+"\n")
 
         # remove links in ( )s
         # primarily this is to address the common case of 
