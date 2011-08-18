@@ -1025,3 +1025,19 @@ analytic_geometry.eg
 - previous link processing; remove after #, replace _
 - ignore links pointing to self
 
+all good!
+
+start from scratch
+
+elastic-mapreduce --create --alive \
+ --num-instances 5 --master-instance-type c1.xlarge --slave-instance-type c1.xlarge \
+ --bootstrap-action s3://mkelcey/wikipediaPhilosophy/install_beautiful_soup_and_mwlib.sh
+
+then follow readme
+
+elastic-mapreduce -c ~/security/credentials.json --create --alive \
+ --master-instance-type cc1.4xlarge --slave-instance-type cc1.4xlarge --instance-count 3 \
+ --bootstrap-action s3://beta.elasticmapreduce/bootstrap-actions/install-ganglia \
+ --bootstrap-action s3://elasticmapreduce/bootstrap-actions/configurations/latest/memory-intensive \
+ --bootstrap-action s3://mkelcey/wikipediaPhilosophy/install_beautiful_soup_and_mwlib.sh \
+ --pig-interactive --name mkelcey_1313088555

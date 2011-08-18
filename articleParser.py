@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import fileinput, re
+import fileinput, re, sys, traceback
 from mwlib.parser.nodes import *
 from mwlib.uparser import parseString, simpleparse
 from BeautifulSoup import BeautifulStoneSoup
@@ -15,8 +15,16 @@ def replace_nested(regex, text):
 def unescape_full(text):
     return unescape(text, {"&apos;": "'", "&quot;": '"'})
 
-def meta_article(link):
-    return ':' in link
+def meta_article(link):    
+    if not ":" in link:
+        return False
+    return link.startswith('File:') \
+           or link.startswith('Category:') \
+           or link.startswith('Wikipedia:') \
+           or link.startswith('Template:') \
+           or link.startswith('Portal:') \
+           or link.startswith('Book:') \
+           or link.startswith('MediaWiki:')
 
 def internal_link(link):
     return link.startswith('#')
@@ -35,6 +43,9 @@ for line in fileinput.input():
         xml = BeautifulStoneSoup(line)
 
         title = unescape_full(xml.find('title').string)
+        if meta_article(title):
+            sys.stderr.write("reporter:counter:parse,ignore_meta_title,1\n")
+            continue
 
         text = unescape_full(xml.find('text').string)
         text = replace_nested('{[^{]*?}', text)    
@@ -44,6 +55,7 @@ for line in fileinput.input():
 
         nodes = [ parseString(title='', raw=text) ]
         while len(nodes) > 0:
+#            print "nodes", nodes
             node = nodes.pop(0)
             node_type = type(node)
 
@@ -52,16 +64,19 @@ for line in fileinput.input():
                 continue
 
             if node_type is Text:
-                text = node.text
+                text = str(node).encode('utf-8')
+#                print "text", text
                 for c in text:
                     if c == '(':
                         parantheses_depth += 1
                     elif c == ')':
                         parantheses_depth -= 1
                 if parantheses_depth < 0:
-                    raise Exception("parantheses_depth < 0? "+str(parantheses_depth)+" for "+title)
-                continue
+                    sys.stderr.write("reporter:counter:parse,neg_parantheses_depth,1\n")
+                    sys.stderr.write("warning! -ve parantheses_depth for ["+str(title).encode('utf-8')+"]\n")
+                    parantheses_depth = 0
 
+#            print "parantheses_depth", parantheses_depth
             if parantheses_depth > 0: 
                 # we're still in brackets, ignore
                 continue

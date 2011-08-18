@@ -9,12 +9,14 @@ bzcat enwiki-20110722-pages-articles.xml.bz2 | ~/flattenToOnePagePerLine.py > en
 # split into redirects and articles
 cat enwiki-20110722-pages-articles.pageperline.xml | grep \<redirect\ \/\> > enwiki-20110722-pages-redirects.xml &   
 cat enwiki-20110722-pages-articles.pageperline.xml | grep -v \<redirect\ \/\> > enwiki-20110722-pages-articles.xml & 
+wait
 
 # move xml for articles and redirects into hdfs 
 hadoop fs -mkdir /full/articles.xml
-hadoop fs -copyFromLocal enwiki-20110722-pages-articles.xml /full/articles.xml
+hadoop fs -copyFromLocal enwiki-20110722-pages-articles.xml /full/articles.xml &
 hadoop fs -mkdir /full/redirects.xml
-hadoop fs -copyFromLocal enwiki-20110722-pages-redirects.xml /full/redirects.xml
+hadoop fs -copyFromLocal enwiki-20110722-pages-redirects.xml /full/redirects.xml &
+wait
 
 # parse redirects
 cd
@@ -59,3 +61,8 @@ grep ^didnt DistanceToPhilosophy.stdout | sed -es/didnt\ visit\ // > didnt_visit
 # summarise why we didn't visit them
 ./walk_till_end.py < didnt_visit > walk_till_end.stdout
 grep end\ of\ line$ walk_till_end.stdout | cut -f2 | sort | uniq -c | sort -nr | head
+
+
+
+San Jose InternationalSeattle-Tacoma International COMcast__11
+tV_s6ALJ
