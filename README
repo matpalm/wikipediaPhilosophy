@@ -13,10 +13,9 @@ wait
 
 # move xml for articles and redirects into hdfs 
 hadoop fs -mkdir /full/articles.xml
-hadoop fs -copyFromLocal enwiki-20110722-pages-articles.xml /full/articles.xml &
+hadoop fs -copyFromLocal enwiki-20110722-pages-articles.xml /full/articles.xml
 hadoop fs -mkdir /full/redirects.xml
-hadoop fs -copyFromLocal enwiki-20110722-pages-redirects.xml /full/redirects.xml &
-wait
+hadoop fs -copyFromLocal enwiki-20110722-pages-redirects.xml /full/redirects.xml
 
 # parse redirects
 cd
@@ -41,28 +40,34 @@ hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
 pig -p INPUT=/full/edges -p OUTPUT=/full/edges.dereferenced -f dereference_redirects.pig
 
 # as a sanity check, should be same
-# pig -p INPUT=/full/edges.dereferenced -p OUTPUT=/full/edges.dereferenced2 -f dereference_redirects.pig 
+# pig -p INPUT=/full/edges.dereferenced -p OUTPUT=/full/edges.dereferenced.sanity -f dereference_redirects.pig 
 
 # get to local filesystem
-hadoop fs -cat /full/edges.dereferenced/* > data/edges
+hadoop fs -cat /full/edges.dereferenced/* > edges
+# hadoop fs -cat /full/edges.dereferenced.sanity/* > edges.sanity
 
-# inject special cases
-cat special_edges_cases >> data/edges
+# add special cases, the parser will, alas, never be perfect...
+cat manually_derived_edges >> edges
 
 # calculate distance from Philosophy
-java -Xmx8g -cp . DistanceToPhilosophy Philosophy data/edges >DistanceToPhilosophy.stdout 2>DistanceToPhilosophy.stderr
+java -Xmx8g -cp distanceToPhilosophy/bin/ DistanceToPhilosophy \
+ Philosophy edges \
+ >DistanceToPhilosophy.stdout 2>DistanceToPhilosophy.stderr
 
-# visited vs non visited
-grep ^FINAL DistanceToPhilosophy.stdout | wc -l 
-grep ^didnt\ visit DistanceToPhilosophy.stdout | wc -l
+# order nodes by their number of descendants
+grep ^FINAL DistanceToPhilosophy.stdout | sed -es/FINAL\ // > distances
+cut -f1 distances > articles
+hfs -mkdir /articles_that_led_to_philosophy
+hfs -copyFromLocal articles /articles_that_led_to_philosophy
+hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+ -input /articles_that_led_to_philosophy -output /num_descendants \
+ -mapper 'count_descendants.py edges' -file count_descendants.py -file edges \
+ -reducer aggregate
+hfs -cat /num_descendants/* | sort -k2 -t"    " -nr > descendants.sorted
 
-# work out which nodes we didn't visit
-grep ^didnt DistanceToPhilosophy.stdout | sed -es/didnt\ visit\ // > didnt_visit
-# summarise why we didn't visit them
-./walk_till_end.py < didnt_visit > walk_till_end.stdout
-grep end\ of\ line$ walk_till_end.stdout | cut -f2 | sort | uniq -c | sort -nr | head
+# draw graph of the top 1000
+head -n 200 descendants.sorted > descendants.top200
+./filter_nodes.py descendants.top200 < edges > filtered.edges.top200
+./to_dot.py filtered.edges.top200 descendants.top200 | dot -Tpng > top200.png
 
 
-
-San Jose InternationalSeattle-Tacoma International COMcast__11
-tV_s6ALJ

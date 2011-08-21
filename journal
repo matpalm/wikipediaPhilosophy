@@ -1041,3 +1041,156 @@ elastic-mapreduce -c ~/security/credentials.json --create --alive \
  --bootstrap-action s3://elasticmapreduce/bootstrap-actions/configurations/latest/memory-intensive \
  --bootstrap-action s3://mkelcey/wikipediaPhilosophy/install_beautiful_soup_and_mwlib.sh \
  --pig-interactive --name mkelcey_1313088555
+
+articleParser
+Map input records 6,293,014
+exception_parsing_article 	 166
+no_link  34,440
+ignore_meta_title 2,569,682 	
+neg_parantheses_depth 1,914 	
+Map output records 	3,688,729
+
+visited 3,540,120
+didnt visit 185,252
+
+hadoop@ip-10-17-182-55:~/wikipediaPhilosophy$ grep end\ of\ line$ walk_till_end.stdout | cut -f2 | sort | uniq -c | sort -nr | head
+  35022 India 
+   3393 Local development ministry (no wiki page)
+   1620 Iraq 
+   1529 Azana (gnat)
+    739 Professional sports
+    561 Uzbekistan
+    479 Bhutan
+    416 Tajikistan
+    349 Borsod-Aba???
+    313 Mental state
+
+looks like there's always going to be special cases...
+India -> South Asia
+Iraq -> Western Asia
+Professional sports -> Amateur sports
+Uzbekistan -> Landlocked country
+Bhutan -> Landlocked country
+Tajikistan -> Landlocked country
+Mental state -> Psychology
+
+brings it down a  bit
+visited 3579277
+didnt visit 146095
+
+grep end\ of\ line$ walk_till_end.stdout | cut -f2 | sort | uniq -c | sort -nr | head
+   3393 Local development ministry
+   1529 Azana (gnat)
+    349 Borsod-Abaúj-Zemplén County
+    312 Cell biology
+    274 Russian Soviet Federative Socialist Republic
+    268 Discing
+    251 Assyrian people
+    247 German Navy
+    236 Indoor American football
+    225 March 21 (Eastern Orthodox liturgics)
+
+getting deminising returns...
+
+cut -f4 walk_till_end.stdout|sort|uniq -c
+  51362 cycle
+  58097 end of line
+  36636 no node
+
+grep no\ node$ walk_till_end.stdout | cut -f2 | sort | uniq -c
+ 36636 NA
+
+-- looking at frequencies
+
+cut -f2 distances | uniq -c | perl -plne's/^\s+//' > distance.freqs
+
+dists = read.delim('distance.freqs', header=FALSE, sep=" ")
+names(dists) <- c("freq","distance")
+library(ggplot2)
+ggplot(head(dists, 70), aes(x=distance, y=freq)) + 
+ geom_line() + geom_point() + 
+ xlab('number of clicks away from philosophy') + ylab('number of articles') +
+ opts(title='distance to philosophy')
+
+--------------------------------
+-- blog notes
+
+general notes to add at start
+- wikipedia is under heavy edit churn. i've been doing this project in 15-20 minutes chunks for a few weeks and it's amazing
+ how often i'd compare the parsing to live wikipedia and find out the page had already subtely changed.
+- i wrote all the code for this in python (trying to move away from ruby to get better data related library support) _except_ for
+the depth first search which i did in java. a 3e6 node dict was _insanely_ slow to access, i must be doing something wrong...
+
+
+to calculate the distance from philosophy for all terms it's a straight forward breadth first search, 
+and because this search doesnt <a href="http://en.wikipedia.org/wiki/Graph_cycle">cycle</a> back to Philosophy again it ends
+up building a <a href="http://en.wikipedia.org/wiki/Tree_(graph_theory)">tree</a>
+
+we can start answering some of our original questions now..
+
+1) there are 3,500,000 articles that lead to philosophy but there are 100,000 articles that don't. these articles fail into a number of sub categories
+
+- cycles; 50,000 articles end up getting are stuck in cycles which is remarkably low given 3,500,000 make it to philosophy.
+
+the vast majority of the cycles are two nodes; eg Waste management -> Waste collection -> Waste management
+
+my favorite that i stumbled across is 'Sand fence -> Snow fence -> Sand fence'
+the first sentence of Snow fence being "A snow fence is a structure, similar to a sand fence ..."
+the first sentence of Sand fence being "A sand fence is a structure similar to a snow fence ..."
+
+- another 50k are dead ends; all sorts of examples for this, mainly around pages that were never written or have been deleted; 
+eg Windsurfing -> Surface water sports -> Discing (which was deleted)
+
+so 
+
+Philosophy -> Reason -> Natural science -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+2) of the articles that do lead to philosophy here's a graph showing the distribution of their distances
+the bulk are defintely between 10 to 30 clicks away.
+
+<img src="num_articles__num_clicks__philosophy.png" />
+
+i've trimmed this graph at 70 clicks away since there's a long tail of one single path that is 1001 clicks away
+
+List of state leaders in 1977 -> List of state leaders in 1976 -> List of state leaders in 1975 -> 
+.... -> List of state leaders in 1001 -> List of state leaders in 1000 -> Fatimid Caliphate -> Arab people 
+-> Panethnicity -> Ethnic group -> Social group 
+-> Social sciences -> List of academic disciplines -> Academia -> Community -> Living -> Life 
+-> Physical body -> Physics -> Natural science -> Science -> Knowledge -> Fact -> Information 
+-> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+
+The longest one I found that didn't include a chain of lists is Violet & Daisy which is 37 articles long.
+
+Violet & Daisy -> Saoirse Ronan -> BAFTA Award for Best Actress in a Supporting Role -> British Academy Film Awards -> British Academy of Film and Television Arts -> David Lean -> Order of the British Empire -> Chivalric order -> Knight -> Warrior -> Combat -> Violence -> Psychological manipulation -> Social influence -> Conformity -> Unconscious mind -> Germans -> Germanic peoples -> Proto-Indo-Europeans -> Proto-Indo-European language -> Linguistic reconstruction -> Internal reconstruction -> Language -> Human -> Extant taxon -> Biology -> Natural science -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy
+considering the first fews depths of the tree
+
+distance freq  comment
+0        1     Philosophy itself
+1        1084  Articles that are one click away from Philosophy
+2        1535  Articles that are two clicks away
+
+-- so the idea is it's not even, there are trodden paths
+
+# calculate number of descendants for each node in tree from philosophy
+cut -f1 distances > articles
+hfs -mkdir /articles_that_led_to_philosophy
+hfs -copyFromLocal articles /articles_that_led_to_philosophy
+hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
+ -input /articles_that_led_to_philosophy -output /num_descendants \
+ -mapper 'count_descendants.py edges' -file count_descendants.py -file edges \
+ -reducer aggregate
+hfs -cat /num_descendants/* | sort -k2 -t"    " -nr > descendants.sorted
+
+# draw graph of the top 1000
+head -n 10 descendants.sorted > descendants.top10
+./filter_nodes.py descendants.top10 < edges > filtered.edges.top10
+./to_dot.py filtered.edges.top10 descendants.top10 | dot -Tpng > blah.png
+
+
+top200 zoom it
+<script src="http://zoom.it/adTw.js?width=auto&height=400px"></script>
+
+top1000 zoom it
+<script src="http://zoom.it/QyGA.js?width=auto&height=400px"></script>
+
+Philosophy -> Reason -> Natural science -> Science -> Knowledge -> Fact -> Information -> Sequence -> Mathematics -> Quantity -> Property (philosophy) -> Modern philosophy -> Philosophy

@@ -93,6 +93,8 @@ for line in fileinput.input():
 
         if link:
             print (title+"\t"+link.strip()).encode('utf-8')
+        else:
+            sys.stderr.write("reporter:counter:parse,no_link,1\n")
 
     except:
         sys.stderr.write("reporter:counter:parse,exception_parsing_article,1\n")
