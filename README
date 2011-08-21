@@ -1,4 +1,8 @@
 
+see http://matpalm.com/blog/2011/08/13/wikipedia-philosophy
+
+-----
+
 # get data
 cd data
 wget http://download.wikimedia.org/enwiki/20110722/enwiki-20110722-pages-articles.xml.bz2   # 7.1gb
