@@ -4,7 +4,7 @@ cd data
 wget http://download.wikimedia.org/enwiki/20110722/enwiki-20110722-pages-articles.xml.bz2   # 7.1gb
 
 # flatten to single line
-bzcat enwiki-20110722-pages-articles.xml.bz2 | ~/flattenToOnePagePerLine.py > enwiki-20110722-pages-articles.pageperline.xml # 30gb
+bzcat enwiki-20110722-pages-articles.xml.bz2 | ~/flatten_to_one_page_per_line.py > enwiki-20110722-pages-articles.pageperline.xml # 30gb
 
 # split into redirects and articles
 cat enwiki-20110722-pages-articles.pageperline.xml | grep \<redirect\ \/\> > enwiki-20110722-pages-redirects.xml &   
@@ -21,7 +21,7 @@ hadoop fs -copyFromLocal enwiki-20110722-pages-redirects.xml /full/redirects.xml
 cd
 hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
  -input /full/redirects.xml -output /full/redirects \
- -mapper redirectParser.py -file redirectParser.py
+ -mapper redirect_parser.py -file redirect_parser.py
 
 # dereference all redirects to their final targets
 pig -p INPUT=/full/redirects -p OUTPUT=/full/redirects.dereferenced1 -f dereference_redirects.pig
@@ -34,7 +34,7 @@ hfs -mv /full/redirects.dereferenced4 /full/redirects
 # run extraction
 hadoop jar ~/contrib/streaming/hadoop-streaming.jar \
  -input /full/articles.xml -output /full/edges \
- -mapper articleParser.py -file articleParser.py
+ -mapper article_parser.py -file article_parser.py
 
 # run redirects against edges
 pig -p INPUT=/full/edges -p OUTPUT=/full/edges.dereferenced -f dereference_redirects.pig
